@@ -56,7 +56,7 @@ class Importer:
         return self._cleanWebpage(html, url)
 
     def _fetchLocalpage(self, filepath):
-        with open(filepath, "r") as f:
+        with open(filepath, "r", encoding='utf-8') as f:
             html = f.read()
             url = urlunsplit(("file", "", filepath, None, None))
             return self._cleanWebpage(html, url, True)
@@ -326,9 +326,14 @@ class Importer:
             importedArticle = []
             for i, article in enumerate(selected, start=1):
                 text = article.get('text')
+                booktitle = article.get('title')
+                author = article.get('author')
+                title = text + ' -- ' + booktitle + ' by ' + author
+
                 href = article['href']
                 if href not in importedArticle:
-                    deck = self.importLocalFile(href, priority, True, text)
+                    #deck = self.importLocalFile(href, priority, True, text)
+                    deck = self.importLocalFile(href, priority, True, title)
                     importedArticle.append(href)
                 else:
                     print(href, "Already imported, Skipping")
