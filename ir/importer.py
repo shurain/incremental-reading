@@ -82,7 +82,7 @@ class Importer:
 
         return webpage
 
-    def _createNote(self, title, text, source, priority=None):
+    def _createNote(self, title, text, source, priority=None, tags=None):
         if self._settings['importDeck']:
             deck = mw.col.decks.by_name(self._settings['importDeck'])
             if not deck:
@@ -100,6 +100,8 @@ class Importer:
         setField(note, self._settings['titleField'], title)
         setField(note, self._settings['textField'], text)
         setField(note, self._settings['sourceField'], source)
+        if tags:
+            note.addTag(tags)
         if priority:
             setField(note, self._settings['prioField'], priority)
         note.note_type()['did'] = did
@@ -151,7 +153,8 @@ class Importer:
 
         return deck
 
-    def importLocalFile(self, filepath=None, priority=None, silent=False, title=None):
+    def importLocalFile(self, filepath=None, priority=None, silent=False, front=None, title=None):
+        # importLocalFile is only used by importEpub
         if not filepath:
             filepath = getFile(None, 'Import Local File', None, filter="*")
 
@@ -177,15 +180,16 @@ class Importer:
 
         body = '\n'.join(map(str, webpage.find('body').children))
         source = self._settings['sourceFormat'].format(
-            date=date.today(), url='<a href="%s">%s</a>' % (filepath, filepath)
+            date=date.today(), url='%s' % (title,)
         )
 
         if self._settings['prioEnabled'] and not priority:
             priority = self._getPriority(webpage.title.string)
 
-        if not title:
-            title = webpage.title.string or filepath
-        deck = self._createNote(title, body, source, priority)
+        if not front:
+            front = webpage.title.string or filepath
+        tags = '-'.join(title.strip().split())
+        deck = self._createNote(front, body, source, priority, tags)
 
         if not silent:
             tooltip('Added to deck: {}'.format(deck))
@@ -332,8 +336,7 @@ class Importer:
 
                 href = article['href']
                 if href not in importedArticle:
-                    #deck = self.importLocalFile(href, priority, True, text)
-                    deck = self.importLocalFile(href, priority, True, title)
+                    deck = self.importLocalFile(href, priority, True, title, booktitle)
                     importedArticle.append(href)
                 else:
                     print(href, "Already imported, Skipping")
