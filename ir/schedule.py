@@ -125,6 +125,9 @@ class Scheduler:
         self._cardListWidget.clear()
         posWidth = len(str(len(cardInfo) + 1))
         for i, card in enumerate(cardInfo, start=1):
+            # skip suspended cards
+            if card['queue'] == -1:
+                continue
             if self._settings['prioEnabled']:
                 info = card['priority']
             else:
@@ -271,21 +274,26 @@ class Scheduler:
             tooltip('Card moved to position {}'.format(newPos))
 
     def reposition(self, card, newPos):
-        cids = [c['id'] for c in self._getCardInfo(card.did)]
+        # Skip suspended cards
+        cids = [c['id'] for c in self._getCardInfo(card.did) if c['queue'] != -1]
+        # Reset schedule for all of the unsuspended cards
         mw.col.sched.forgetCards(cids)
         cids.remove(card.id)
         newOrder = cids[: newPos - 1] + [card.id] + cids[newPos - 1 :]
         mw.col.sched.reposition_new_cards(newOrder, starting_from=1, step_size=1, randomize=False, shift_existing=False)
 
     def reorder(self, cids):
+        # reorder is called when you invoke alt+2
+        # _updateListItems will skip suspended cards and only pass unsuspended cids
+        # So calling this do not unsuspend the cards
         mw.col.sched.forgetCards(cids)
         mw.col.sched.reposition_new_cards(cids, starting_from=1, step_size=1, randomize=False, shift_existing=False)
 
     def _getCardInfo(self, did):
         cardInfo = []
 
-        for cid, nid in mw.col.db.execute(
-            'select id, nid from cards where did = ?', did
+        for cid, nid, queue in mw.col.db.execute(
+            'select id, nid, queue from cards where did = ?', did
         ):
             note = mw.col.get_note(nid)
             if note.note_type()['name'] == self._settings['modelName']:
@@ -300,6 +308,7 @@ class Scheduler:
                         'nid': nid,
                         'title': note[self._settings['titleField']],
                         'priority': prio,
+                        'queue': queue,
                     }
                 )
 
