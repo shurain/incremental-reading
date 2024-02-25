@@ -196,6 +196,7 @@ class ReadingManager:
 def answerButtonList(self, _old: Any) -> tuple[tuple[int, str], ...]:
     if isIrCard(self.card):
         if mw.readingManager.settings['prioEnabled']:
+            # FIXME maybe show current priority and lower/higher option?
             return ((1, 'Next'),)
         return ((1, 'Soon'), (2, 'Later'), (3, 'Custom'))
 

@@ -221,6 +221,15 @@ class Scheduler:
             for item in allItems:
                 priority = item.data(Qt.ItemDataRole.UserRole)['priority']
                 if priority != '':
+                    # mean = 10 - priority
+                    # std = 10 / 20 = 0.5
+                    # So with priority 10, you have mean of 0
+                    # With priority 1, you have mean of 9
+                    # std is also related to priority
+                    # 1/20 -> 0.25 so... mostly landing somewhere near the mean
+                    # 2 sigma handles 95% cases so mean +- 0.5
+                    # 10/20 -> 0.5 so... this also is not really meaningful
+                    # 2 sigma is 1, so mean +- 1
                     item.contNewPos = gauss(
                         maxPrio - int(priority), maxPrio / 20
                     )
@@ -258,14 +267,15 @@ class Scheduler:
             self.showDialog(card)
             return
 
+        totalCards = len([c['id'] for c in self._getCardInfo(card.did) if c['queue'] != -1])  # Skip suspended cards
         if method == 'percent':
-            totalCards = len([c['id'] for c in self._getCardInfo(card.did)])
             newPos = totalCards * (value / 100)
         elif method == 'count':
             newPos = value
 
         if randomize:
-            newPos = gauss(newPos, newPos / 10)
+            # Scatter around roughly 10%
+            newPos = gauss(newPos, totalCards * 0.1)
 
         newPos = max(1, round(newPos))
         self.reposition(card, newPos)
