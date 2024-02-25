@@ -14,6 +14,7 @@
 # PERFORMANCE OF THIS SOFTWARE.
 
 import os
+import re
 from datetime import date
 from pathlib import Path
 from urllib.error import HTTPError
@@ -61,7 +62,52 @@ class Importer:
             url = urlunsplit(("file", "", filepath, None, None))
             return self._cleanWebpage(html, url, True)
 
+    def is_using_mathjax(self, html):
+        try:
+            html_content = html
+            # Parse the HTML
+            soup = BeautifulSoup(html_content, 'html.parser')
+            # Search for MathJax script tags
+            scripts = soup.find_all('script', {'src': True})
+            for script in scripts:
+                if 'MathJax.js' in script['src']:
+                    return True, script['src']
+            # Search for inline MathJax configuration
+            inline_configs = soup.find_all('script', {'type': 'text/x-mathjax-config'})
+            if inline_configs:
+                return True, 'Found inline MathJax configuration'
+            # You could extend this to search for CSS or specific classes if needed
+            # But these checks should cover basic MathJax detection
+            return False, 'MathJax not detected'
+        except requests.RequestException as e:
+            return False, f"Error fetching page: {e}"
+
+    def standardize_math_delimiters(self, html_content):
+        """
+        This function replaces inline and display math delimiters 
+        with \( ... \) for inline and \[ ... \] for display math.
+        """
+        # Patterns to find and replace various common delimiters
+        # You might need to expand these patterns based on observed configurations
+        patterns = {
+            # Display Math replacements
+            r'\$\$(.*?)\$\$': r'\\[\1\\]',  # Replaces $$...$$ with \[...\]
+            r'\\begin\{equation\}(.*?)\\end\{equation\}': r'\\[\\begin{equation}\1\\end{equation}\\]',  # Replaces \begin{equation}...\end{equation} with \[...\]
+            r'\\begin\{equation\*\}(.*?)\\end\{equation\*\}': r'\\[\\begin{equation*}\1\\end{equation*}\\]',  # Replaces \begin{equation*}...\end{equation*} with \[...\]
+            r'\\begin\{align\}(.*?)\\end\{align\}': r'\\[\\begin{align}\1\\end{align}\\]',  # Replaces \begin{align}...\end{align} with \[...\]
+            r'\\begin\{align\*\}(.*?)\\end\{align\*\}': r'\\[\\begin{align*}\1\\end{align*}\\]',  # Replaces \begin{align*}...\end{align*} with \[...\]
+            # XXX This has to come after swapping $$ to function properly
+            # Inline Math replacements
+            r'\$(.*?)\$': r'\\(\1\\)',  # Replaces $...$ with \(...\)
+            # Note: Additional patterns might be needed for other delimiters like \begin{equation}, etc.
+        }
+        for pattern, replacement in patterns.items():
+            html_content = re.sub(pattern, replacement, html_content, flags=re.DOTALL)
+        return html_content
+
     def _cleanWebpage(self, html, url, local=False):
+        use_mathjax, _ = self.is_using_mathjax(html)
+
         webpage = BeautifulSoup(html, 'html.parser')
 
         for tagName in self._settings['badTags']:
@@ -80,7 +126,12 @@ class Importer:
         for link in webpage.find_all('link'):
             self._processLinkTag(url, link, local)
 
-        return webpage
+        body = '\n'.join(map(str, webpage.find('body').children))
+
+        if use_mathjax:
+            body = self.standardize_math_delimiters(body)
+
+        return body, webpage
 
     def _createNote(self, title, text, source, priority=None, tags=None):
         if self._settings['importDeck']:
@@ -125,7 +176,7 @@ class Importer:
             return
 
         try:
-            webpage = self._fetchWebpage(url)
+            body, webpage = self._fetchWebpage(url)
         except HTTPError as error:
             showWarning(
                 'The remote server has returned an error: '
@@ -136,7 +187,6 @@ class Importer:
             showWarning('There was a problem connecting to the website.')
             return
 
-        body = '\n'.join(map(str, webpage.find('body').children))
         source = self._settings['sourceFormat'].format(
             date=date.today(), url='<a href="%s">%s</a>' % (url, url)
         )
@@ -330,8 +380,14 @@ class Importer:
             importedArticle = []
             for i, article in enumerate(selected, start=1):
                 text = article.get('text')
+                if not text:
+                    text = 'Unknown'
                 booktitle = article.get('title')
+                if not booktitle:
+                    booktitle = 'Unknown'
                 author = article.get('author')
+                if not author:
+                    author = 'Unknown'
                 title = text + ' -- ' + booktitle + ' by ' + author
 
                 href = article['href']
