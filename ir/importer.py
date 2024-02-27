@@ -72,6 +72,8 @@ class Importer:
             for script in scripts:
                 if 'MathJax.js' in script['src']:
                     return True, script['src']
+                if 'mathjax' in script['src']:
+                    return True, script['src']
             # Search for inline MathJax configuration
             inline_configs = soup.find_all('script', {'type': 'text/x-mathjax-config'})
             if inline_configs:
