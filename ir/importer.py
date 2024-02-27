@@ -219,7 +219,7 @@ class Importer:
             return
 
         try:
-            webpage = self._fetchLocalpage(filepath)
+            body, webpage = self._fetchLocalpage(filepath)
         except HTTPError as error:
             showWarning(
                 'The remote server has returned an error: '
