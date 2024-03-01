@@ -455,7 +455,6 @@ class Importer:
     def _processImgTag(self, url: str, img: PageElement, local=False):
         if img.get('src'):
             img['src'] = urljoin(url, img.get('src', ''))
-        print("src=",img['src'])
         if local and urlsplit(img['src']).scheme == "file":
             filepath = url2pathname(urlsplit(img['src']).path) 
             mediafilepath = mw.col.media.add_file(filepath)
