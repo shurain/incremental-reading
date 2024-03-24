@@ -128,7 +128,10 @@ class Importer:
         for link in webpage.find_all('link'):
             self._processLinkTag(url, link, local)
 
-        body = '\n'.join(map(str, webpage.find('body').children))
+        if webpage.find('body'):
+            body = '\n'.join(map(str, webpage.find('body').children))
+        else:
+            body = webpage.text
 
         if use_mathjax:
             body = self.standardize_math_delimiters(body)
